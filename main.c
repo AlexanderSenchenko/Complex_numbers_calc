@@ -13,12 +13,12 @@ void read_complex(struct Complex *compl)
 	scanf("%d", &(compl->img));
 }
 
-void free_name_libs(char** name_libs, int count_libs)
+void free_lib_names(char** lib_names, int count_libs)
 {
 	int i;
 	for (i = 0; i < count_libs; ++i)
-		free(name_libs[i]);
-	free(name_libs);
+		free(lib_names[i]);
+	free(lib_names);
 }
 
 void free_libsd(void** libsd, int count_libs)
@@ -32,68 +32,43 @@ void free_libsd(void** libsd, int count_libs)
 int main(int argc, char** argv)
 {
 	int act;
+	int i, j, k;
 
 	char PATH[] = "/home/users/summer_2019/user21/Complex_numbers_calc/";
 	int size_path = strlen(PATH);
 
-	char** name_libs;
 	int count_libs = argc - 1;
+	int size_buff;
 
-	int size_buf;
-	char* path_buf;
-	path_buf = malloc(sizeof(char) * size_path);
-	strcpy(path_buf, PATH);
-
+	char* path_buff;
+	path_buff = malloc(sizeof(char) * size_path);
+	strcpy(path_buff, PATH);
+	
 	struct Complex compl1;
 	struct Complex compl2;
 	struct Complex res;
 
-	name_libs = malloc(sizeof(char*) * count_libs);
-
-	int i, j;
-	size_t name_size;
-	for (i = 0; i < count_libs; ++i) {
-		name_size = strlen(argv[i + 1]);
-		
-		#ifdef DEBUG
-		printf("%zu\n", name_size);
-		#endif
-		
-		name_libs[i] = malloc(sizeof(char) * name_size);
-
-		// for (j = 0; j < name_size; ++j)
-		//	name_libs[i][j] = argv[i + 1][j];
-		strcpy(name_libs[i], argv[i + 1]);
-	}
-
-	#ifdef DEBUG
-	for (i = 0; i < count_libs; ++i)
-		printf("%s\n", name_libs[i]);
-	#endif
-
-	// void* libd = dlopen("/home/users/summer_2019/user21/compl/libmyComplex.so", RTLD_NOW);	
 	void** libsd;
+	libsd = malloc(sizeof(void*) * count_libs);
 
-	int k;
-	int size_name_lib;
-	libsd = malloc(count_libs);
+	int lib_name_size;
+
 	for (i = 0; i < count_libs; ++i) {
-		size_buf = strlen(path_buf);
-		size_name_lib = strlen(name_libs[i]);
+		size_buff = strlen(path_buff);
+		lib_name_size = strlen(argv[i + 1]);
+
+		if (size_buff < size_path + lib_name_size + 1)
+			path_buff = realloc(path_buff, size_path + lib_name_size + 1);
 		
-		if (size_buf < size_path + size_name_lib + 1)
-			path_buf = realloc(path_buf, size_path + size_name_lib + 1);
+		for (j = size_path, k = 0; j < size_path + lib_name_size; ++j, ++k)
+			path_buff[j] = argv[i + 1][k];
+		path_buff[j] = '\0';
 		
-		for (j = size_path, k = 0; j < size_path + size_name_lib; ++j, ++k)
-			path_buf[j] = name_libs[i][k];
-		path_buf[j] = '\0';
-		
-		libsd[i] = dlopen(path_buf, RTLD_NOW);
+		libsd[i] = dlopen(path_buff, RTLD_NOW);
 	
 		if (!(libsd[i])) {
 			fprintf(stderr, "%s\n", dlerror());
-			free_name_libs(name_libs, count_libs);
-			free(path_buf);
+			free(path_buff);
 			free(libsd);
 			exit(EXIT_FAILURE);
 		}
@@ -101,93 +76,103 @@ int main(int argc, char** argv)
 		dlerror();
 	}
 
-	free(path_buf);
-	
+	free(path_buff);
+
+	#if 1 
 	struct Complex (**func)(struct Complex, struct Complex);
 	func = malloc(sizeof(*func) * count_libs);
-	char name_func[15];
+
+	char** func_names;
+	func_names = malloc(sizeof(char*) * count_libs);
+
+	int func_name_size;
 
 	for (i = 0; i < count_libs; ++i) {
-		for (j = 0; name_libs[i][j + 3] != '.'; ++j)
-			name_func[j] = name_libs[i][j + 3];
-		name_func[j] = '\0';
+		func_name_size = strlen(argv[i + 1]) - 3 - 3; // lib*.so
+		func_names[i] = malloc(sizeof(char) * func_name_size + 1);
 
-		func[i] = dlsym(libsd[i], name_func);
+		for (j = 0; j < func_name_size; ++j)
+			func_names[i][j] = argv[i + 1][j + 3];
+		func_names[i][j] = '\0';
+
+		func[i] = dlsym(libsd[i], func_names[i]);
 
 		#ifdef DEBUG
-		printf("%s\n", name_func);
+		printf("%s\n", func_names[i]);
 		#endif
 
 		char* error = dlerror();
 		if (error != NULL) {
 			fprintf(stderr, "%s\n", error);
-			free_name_libs(name_libs, count_libs);
 			free_libsd(libsd, count_libs);
 			free(func);
+			free(func_names);
 			exit(EXIT_FAILURE);
 		}
 
 		dlerror();
 	}
 
-	#if 0
-	struct Complex (*func_add)(struct Complex, struct Complex);
-	func_add = dlsym(libd, "complex_add");
+	do {
+		for (i = 0; i < count_libs; ++i)
+			printf("%d) %s\n", i + 1, func_names[i]);
+		printf("%d) Exit\n", count_libs + 1);
 
-	char* error = dlerror();
+		printf("Input act: ");
+		scanf("%d", &act);
+	
+		if (act < count_libs + 1) {
+			printf("Input first complex number\n");
+			read_complex(&compl1);
+
+			printf("Input second comolex number\n");
+			read_complex(&compl2);
+
+			res = (func[act - 1])(compl1, compl2);
+
+			printf("Calc result\n");
+			complex_print(res);
+		} else if (act == count_libs + 1) {
+			printf("Exit\n");
+		} else {
+			printf("Act not found\n");
+		}
+	} while(act != count_libs + 1);
+	#else
+	compl1.real = 12;
+	compl1.img = 12;
+
+	compl2.real = 12;
+	compl2.img = 12;
+
+	struct Complex (*func)(struct Complex, struct Complex);
+	func = dlsym(libsd[0], "complex_add");
+
+	char *error = dlerror();
 	if (error != NULL) {
 		fprintf(stderr, "%s\n", error);
+		// free_libsd(libsd, count_libs);
+		// free(func);
+		// free(func_names);
 		exit(EXIT_FAILURE);
 	}
-	#endif
+	res = (*func)(compl1, compl2);
 
-	do {
-		printf("1) Add\n");
-		printf("2) Sub\n");
-		printf("3) Multn\n");
-		printf("4) Div\n");
-		printf("5) Quit\n");
-		printf("Input act: ");
-
-		scanf("%d", &act);
-
-		switch(act) {
-			case 1:
-				read_complex(&compl1);
-				read_complex(&compl2);
-				
-				// res = (*func_add)(compl1, compl2);
-				
-				complex_print(res);
-				break;
-			case 2:
-				// complex_sub();
-				break;
-			case 3:
-				// complex_mult();
-				break;
-			case 4:
-				// complex_div();
-				break;
-			case 5:
-				printf("Exit\n");
-				break;
-			default:
-				printf("Act not found\n");
-				break;
-		}
-	} while(act != 5);
-
-	#if 0
-	for (i = 0; i < count_libs; ++i)
-		free(name_libs[i]);
-	free(name_libs);
-	#else
-	free_name_libs(name_libs, count_libs);
+	complex_print(res);
 	#endif
 
 	free_libsd(libsd, count_libs);
-	free(func);
+	// free(func);
+	
+	#if 0
+	if (func_names != NULL) {
+		for (i = 0; i < count_libs; ++i) {
+			if (func_names[i] != NULL)
+				free(func_names[i]);
+		}
+		free(func_names);
+	}
+	#endif
 
 	return 0;
 }
