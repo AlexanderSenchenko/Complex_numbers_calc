@@ -13,20 +13,28 @@ void read_complex(struct Complex *compl)
 	scanf("%d", &(compl->img));
 }
 
-void free_lib_names(char** lib_names, int count_libs)
-{
-	int i;
-	for (i = 0; i < count_libs; ++i)
-		free(lib_names[i]);
-	free(lib_names);
-}
-
 void free_libsd(void** libsd, int count_libs)
 {
 	int i;
-	for (i = 0; i < count_libs; ++i)
-		dlclose(libsd[i]);
-	free(libsd);
+	if (libsd != NULL) {
+		for (i = 0; i < count_libs; ++i) {
+			if (libsd[i] != NULL)
+				dlclose(libsd[i]);
+		}
+		free(libsd);
+	}
+}
+
+void free_func_names(char** func_names, int count_libs)
+{
+	int i;
+	if (func_names != NULL) {
+		for (i = 0; i < count_libs; ++i) {
+			if (func_names[i] != NULL)
+				free(func_names[i]);
+		}
+		free(func_names);
+	}
 }
 
 int main(int argc, char** argv)
@@ -68,8 +76,10 @@ int main(int argc, char** argv)
 	
 		if (!(libsd[i])) {
 			fprintf(stderr, "%s\n", dlerror());
+
 			free(path_buff);
-			free(libsd);
+			free_libsd(libsd, count_libs);
+
 			exit(EXIT_FAILURE);
 		}
 
@@ -78,7 +88,6 @@ int main(int argc, char** argv)
 
 	free(path_buff);
 
-	#if 1 
 	struct Complex (**func)(struct Complex, struct Complex);
 	func = malloc(sizeof(*func) * count_libs);
 
@@ -104,9 +113,11 @@ int main(int argc, char** argv)
 		char* error = dlerror();
 		if (error != NULL) {
 			fprintf(stderr, "%s\n", error);
+
 			free_libsd(libsd, count_libs);
 			free(func);
-			free(func_names);
+			free_func_names(func_names, count_libs);
+
 			exit(EXIT_FAILURE);
 		}
 
@@ -138,41 +149,10 @@ int main(int argc, char** argv)
 			printf("Act not found\n");
 		}
 	} while(act != count_libs + 1);
-	#else
-	compl1.real = 12;
-	compl1.img = 12;
-
-	compl2.real = 12;
-	compl2.img = 12;
-
-	struct Complex (*func)(struct Complex, struct Complex);
-	func = dlsym(libsd[0], "complex_add");
-
-	char *error = dlerror();
-	if (error != NULL) {
-		fprintf(stderr, "%s\n", error);
-		// free_libsd(libsd, count_libs);
-		// free(func);
-		// free(func_names);
-		exit(EXIT_FAILURE);
-	}
-	res = (*func)(compl1, compl2);
-
-	complex_print(res);
-	#endif
 
 	free_libsd(libsd, count_libs);
-	// free(func);
-	
-	#if 0
-	if (func_names != NULL) {
-		for (i = 0; i < count_libs; ++i) {
-			if (func_names[i] != NULL)
-				free(func_names[i]);
-		}
-		free(func_names);
-	}
-	#endif
+	free_func_names(func_names, count_libs);
+	free(func);
 
 	return 0;
 }
